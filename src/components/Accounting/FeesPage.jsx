@@ -1,0 +1,301 @@
+import { useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import Header from '../shared/Header'
+import Icon from '../Icon'
+import { initials, price } from '../Students/utils/studentHelpers'
+import { exportToPdf, safeFilename } from '../../utils/exportToPdf'
+import { useDemo } from '../../data/DemoContext'
+import { APP } from '../../data/config'
+import { SHORT_MONTHS as months, monthLabel } from '../../data/calendar'
+import { subjects } from '../../data/catalog'
+import { assignmentOptions, fullName, monthlyFee, sameId, shortBranch, studentFormDetails, subjectPrice } from '../../data/selectors'
+import './FeesPage.css'
+import './FeesEditModal.css'
+import './Receipt.css'
+
+const STATUS_LABELS = { paid: 'payé', due: 'impayé', upcoming: 'à venir', inactive: 'non inscrit' }
+
+function AdvanceModal({ student, close, onValidate }) {
+  const [selectedMonths, setSelectedMonths] = useState([]);
+
+  // Mois encore à régler (impayés ou à venir)
+  const unpaidMonths = student.payments
+    .map((status, index) => ({ month: months[index], index, status }))
+    .filter(item => item.status === 'due' || item.status === 'upcoming');
+
+  // Get paid months (disabled)
+  const paidMonths = student.payments
+    .map((status, index) => ({ month: months[index], index, status }))
+    .filter(item => item.status === 'paid');
+
+  const toggleMonth = (index) => {
+    setSelectedMonths(prev =>
+      prev.includes(index)
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
+
+  const totalAmount = selectedMonths.length * student.monthly;
+
+  const handleValidate = () => {
+    onValidate([...selectedMonths].sort((a, b) => a - b));
+    close();
+  };
+
+  return (
+    <div className="fee-overlay">
+      <section className="payment-modal">
+        <button className="modal-close" onClick={close}>×</button>
+        <h2>Avance de paiement</h2>
+        <div className="payment-person">
+          <i>{initials(student.name)}</i>
+          <span>
+            <b>{student.name}</b>
+            <small>{student.code}</small>
+          </span>
+        </div>
+        <div className="payment-amount">
+          <span>Montant dû/mois</span>
+          <strong>{student.monthly} DH</strong>
+        </div>
+
+        <div className="advance-months-selection">
+          <h3>Mois à payer</h3>
+          <div className="advance-months-grid">
+            {unpaidMonths.map(({ month, index }) => (
+              <label key={index} className="advance-month-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedMonths.includes(index)}
+                  onChange={() => toggleMonth(index)}
+                />
+                <span>{month}</span>
+              </label>
+            ))}
+          </div>
+
+          <h3>Mois déjà payés</h3>
+          <div className="advance-months-grid">
+            {paidMonths.map(({ month, index }) => (
+              <label key={index} className="advance-month-checkbox disabled">
+                <input type="checkbox" disabled />
+                <span>{month}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="advance-total">
+          <span>Total à payer</span>
+          <strong>{totalAmount} DH</strong>
+        </div>
+
+        <div className="advance-actions">
+          <button className="advance-cancel" onClick={close}>Annuler</button>
+          <button
+            className="validate-button"
+            onClick={handleValidate}
+            disabled={selectedMonths.length === 0}
+          >
+            Valider l'avance
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Receipt({ receipts, close }) {
+  const receiptRefs = useRef([])
+  const [isExporting, setIsExporting] = useState(false)
+  const allReceipts = Array.isArray(receipts) ? receipts : [receipts]
+
+  const downloadPdf = async (receipt = allReceipts[0], receiptIndex = 0) => {
+    setIsExporting(true)
+    try {
+      await exportToPdf(
+        receiptRefs.current[receiptIndex],
+        `recu-paiement-${safeFilename(receipt.student.name)}-${safeFilename(receipt.month)}.pdf`
+      )
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleDownloadAll = async () => {
+    setIsExporting(true)
+    try {
+      for (const [index, receipt] of allReceipts.entries()) {
+        await exportToPdf(
+          receiptRefs.current[index],
+          `recu-paiement-${safeFilename(receipt.student.name)}-${safeFilename(receipt.month)}.pdf`
+        )
+      }
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  return (
+    <main className="fee-receipt">
+      <div className="fee-receipt-actions">
+        <button onClick={close}>← Retour</button>
+        {allReceipts.length > 1 ? (
+          <button
+            className="fee-print"
+            disabled={isExporting}
+            onClick={handleDownloadAll}
+          >
+            {isExporting ? 'Génération des PDF…' : '▣  Télécharger tous les reçus'}
+          </button>
+        ) : (
+          <button
+            className="fee-print"
+            disabled={isExporting}
+            onClick={() => downloadPdf()}
+          >
+            {isExporting ? 'Génération du PDF…' : '▣  Télécharger le reçu'}
+          </button>
+        )}
+      </div>
+
+      <div className="fee-receipts">
+        {allReceipts.map((receipt, index) => (
+          <article
+            key={index}
+            ref={(element) => { receiptRefs.current[index] = element }}
+            className="fee-document"
+          >
+            <header>
+              <div className="fee-brand">
+                <img src={APP.logo} alt={`Logo ${APP.name}`} />
+                <div>
+                  <strong>{APP.name}</strong>
+                  <span>{APP.tagline} — {receipt.student.branch}</span>
+                </div>
+              </div>
+              <div className="fee-ref">
+                <span>REÇU DE PAIEMENT MENSUEL</span>
+                <b>{receipt.student.code}</b>
+                <small>Date : {new Intl.DateTimeFormat('fr-MA').format(new Date())}</small>
+              </div>
+            </header>
+
+            <section className="fee-receipt-student">
+              <div>{initials(receipt.student.name)}</div>
+              <p>
+                <strong>{receipt.student.name}</strong>
+                <small>Niveau : {receipt.student.level}</small>
+                <small>Mois réglé : {receipt.month}</small>
+              </p>
+            </section>
+
+            <section className="fee-lines">
+              <h2>Détail des matières</h2>
+              <div className="fee-line fee-line-head">
+                <span>Matière</span>
+                <span>Prix</span>
+              </div>
+              {receipt.student.chosen.map((subject) => (
+                <div className="fee-line" key={subject}>
+                  <span>{subject}</span>
+                  <span>{subjectPrice(receipt.student, subject)} DH</span>
+                </div>
+              ))}
+              <div className="fee-total">
+                <b>Montant total payé</b>
+                <strong>{receipt.student.monthly} DH</strong>
+              </div>
+            </section>
+
+            <div className="fee-confirmation">
+              ✓ Paiement reçu en espèces — Le {new Intl.DateTimeFormat('fr-MA').format(new Date())}
+            </div>
+
+            <footer>
+              <span>Signature parent/tuteur</span>
+              <span>Signature administration</span>
+            </footer>
+          </article>
+        ))}
+      </div>
+    </main>
+  )
+}
+
+function AdvanceReceiptsModal({ receipts, close, onPrint }) {
+  const student = receipts[0]?.student
+
+  if (!student) return null
+
+  return (
+    <div className="fee-overlay">
+      <section className="advance-receipts-modal" role="dialog" aria-modal="true" aria-labelledby="advance-receipts-title">
+        <button className="modal-close" onClick={close} aria-label="Fermer">×</button>
+        <h2 id="advance-receipts-title">Paiement d'avance</h2>
+        <div className="payment-person">
+          <i>{initials(student.name)}</i>
+          <span><b>{student.name}</b><small>{student.code}</small></span>
+          <strong className="advance-monthly-amount"><small>Dû / mois</small>{student.monthly} DH</strong>
+        </div>
+        <div className="validated">✓ Avance validée — {receipts.length} reçu{receipts.length > 1 ? 's générés' : ' généré'}</div>
+        <div className="advance-receipt-list">
+          {receipts.map((item) => (
+            <div className="advance-receipt-item" key={item.month}>
+              <span>Reçu — {item.month} · {item.student.monthly} DH</span>
+              <button onClick={() => onPrint(item)}>▣ <b>Imprimer</b></button>
+            </div>
+          ))}
+        </div>
+        <footer className="advance-receipts-actions">
+          <button className="advance-cancel" onClick={close}>Fermer</button>
+          <button className="fee-print" onClick={() => onPrint(receipts)}>▣ &nbsp; Imprimer tous les reçus</button>
+        </footer>
+      </section>
+    </div>
+  )
+}
+
+function EditSubjectsModal({ editing, setEditing, close, save }) {
+  const demo = useDemo()
+  const toggleSubject = subject => setEditing(e => ({ ...e, chosen: e.chosen.includes(subject) ? e.chosen.filter(s => s !== subject) : [...e.chosen, subject], subjectDetails: { ...e.subjectDetails, [subject]: e.subjectDetails?.[subject] || { teacherId: '', groupId: '', priceType: 'standard', manualPrice: '' } } }))
+  const setSubjectDetails = (subject, changes) => setEditing(e => ({ ...e, subjectDetails: { ...e.subjectDetails, [subject]: { ...e.subjectDetails?.[subject], ...changes } } }))
+
+  return <div className="fee-overlay"><section className="edit-modal"><button className="modal-close" onClick={close}>×</button><h2>Modifier les matières & groupes</h2><p>{editing.name} — sélectionnez les matières auxquelles l'élève est inscrit.</p><div className="edit-subjects">{subjects.map(subject => {
+    const selected = editing.chosen.includes(subject)
+    const details = { teacherId: '', groupId: '', priceType: 'standard', manualPrice: '', ...editing.subjectDetails?.[subject] }
+    const { teacherOptions, groupOptions } = assignmentOptions(demo, subject, { level: editing.level, branch: editing.branch, teacherId: details.teacherId })
+    const chooseGroup = (groupId) => { const group = demo.groups.find((item) => sameId(item.id, groupId)); setSubjectDetails(subject, { groupId, teacherId: group?.teacherId ?? details.teacherId }) }
+    return <article key={subject} className={selected ? 'selected' : ''}><label className="edit-subject-toggle"><input type="checkbox" checked={selected} onChange={() => toggleSubject(subject)} /><span><b>{subject}</b><small>{price(subject)} DH/mois</small></span></label>{selected && <div className="edit-subject-details"><label>Professeur<select value={details.teacherId} onChange={e => setSubjectDetails(subject, { teacherId: e.target.value, groupId: '' })}><option value="">Choisir un professeur</option>{teacherOptions.map((teacher) => <option key={teacher.id} value={teacher.id}>{fullName(teacher)}</option>)}</select></label><label>Groupe<select value={details.groupId} onChange={e => chooseGroup(e.target.value)}><option value="">Choisir un groupe</option>{groupOptions.map((group) => <option key={group.id} value={group.id}>{group.name} · {shortBranch(group.branch)}</option>)}</select></label><fieldset><legend>Tarification</legend><label className={details.priceType === 'standard' ? 'active' : ''}><input type="radio" name={`${subject}-price`} checked={details.priceType === 'standard'} onChange={() => setSubjectDetails(subject, { priceType: 'standard' })} /><span><b>Prix standard</b><small>{price(subject)} DH/mois</small></span></label><label className={details.priceType === 'manual' ? 'active' : ''}><input type="radio" name={`${subject}-price`} checked={details.priceType === 'manual'} onChange={() => setSubjectDetails(subject, { priceType: 'manual' })} /><span><b>Prix manuel</b><input type="number" min="0" placeholder="Montant DH" disabled={details.priceType !== 'manual'} value={details.manualPrice} onChange={e => setSubjectDetails(subject, { manualPrice: e.target.value })} /></span></label></fieldset></div>}</article>
+  })}</div><footer><button onClick={close}>Annuler</button><button className="validate-button" onClick={save}>Enregistrer</button></footer></section></div>
+}
+
+export default function FeesPage() {
+  const { students: allStudents, groups, payments, setPayments, saveStudentSubjects } = useDemo()
+  const [query, setQuery] = useState(''), [selected, setSelected] = useState(null), [editing, setEditing] = useState(null), [receipt, setReceipt] = useState(null), [advance, setAdvance] = useState(null), [advanceReceipts, setAdvanceReceipts] = useState(null)
+  // Chaque ligne = un élève, son tarif mensuel (somme de ses matières) et ses 12 mois de paiement.
+  const students = useMemo(() => allStudents.map(s => ({ ...s, monthly: monthlyFee(s), payments: payments[s.id] || Array(12).fill('inactive') })), [allStudents, payments])
+  const shown = useMemo(() => students.filter(s => `${s.name} ${s.code}`.toLowerCase().includes(query.toLowerCase())), [students, query])
+  const collectedTotal = useMemo(() => students.reduce((sum, s) => sum + s.payments.filter(p => p === 'paid').length * s.monthly, 0), [students])
+  const openPayment = (student, index) => { if (student.payments[index] !== 'inactive') setSelected({ student, index }) }
+  const paidCopy = (student, indexes) => ({ ...student, payments: student.payments.map((p, i) => indexes.includes(i) ? 'paid' : p) })
+  const validate = () => { setPayments(selected.student.id, [selected.index]); setReceipt({ student: paidCopy(selected.student, [selected.index]), month: monthLabel(selected.index) }); setSelected(null) }
+  const saveEdit = () => { saveStudentSubjects(editing.id, editing.chosen, editing.subjectDetails); setEditing(null) }
+
+  const validateAdvance = (student, selectedMonths) => {
+    const paidStudent = paidCopy(student, selectedMonths)
+    setPayments(student.id, selectedMonths)
+    setAdvanceReceipts(selectedMonths.map(index => ({ student: paidStudent, month: monthLabel(index) })))
+  };
+
+  if (receipt) return <Receipt receipts={receipt} close={() => setReceipt(null)} />
+  return <div className="fees-page"><Header /><main className="fees-content"><div className="fees-heading"><h1>Comptabilité</h1><p>Gestion financière du centre.</p></div><nav className="accounting-tabs"><Link className="active" to="/accounting/fees">Frais de scolarité</Link><Link to="/accounting/delinquencies">Retards & Impayés</Link><Link to="/accounting/salaries">Salaires Profs</Link><Link to="/accounting/expenses">Charges</Link><Link to="/accounting/profit">Bénéfice net</Link></nav>
+    <section className="fee-stats"><article><span>Total encaissé (année)</span><strong>{collectedTotal.toLocaleString('fr-FR')} DH</strong><i className="fee-stat-icon fee-stat-icon--green"><Icon name="trending-up" /></i></article><article><span>Élèves facturés</span><strong>{students.length}</strong><i className="fee-stat-icon"><Icon name="users" /></i></article><article><span>Dû mensuel total</span><strong>{students.reduce((sum,s) => sum + s.monthly, 0).toLocaleString('fr-FR')} DH</strong><i className="fee-stat-icon fee-stat-icon--red"><Icon name="wallet" /></i></article></section>
+    <label className="fees-search"><Icon name="search" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Rechercher un élève..." /></label>
+    <div className="fees-table-wrap"><table className="fees-table"><thead><tr><th>Élève</th><th>Niveau</th><th>Matières</th><th>Dû/mois</th>{months.map(m => <th key={m}>{m}</th>)}<th aria-label="Actions" /></tr></thead><tbody>{shown.map(student => <tr key={student.id}><td><div className="fee-student"><i>{initials(student.name)}</i><span><b>{student.name}</b><small>{student.code}</small></span></div></td><td>{student.level}</td><td>{student.chosen.length}</td><td><b>{student.monthly} DH</b></td>{student.payments.map((state, index) => <td key={index}><button aria-label={`${months[index]} : ${STATUS_LABELS[state]}`} title={`${months[index]} : ${STATUS_LABELS[state]}`} className={`payment-dot ${state}`} disabled={state === 'inactive'} onClick={() => openPayment(student,index)} /></td>)}<td><div className="fee-actions"><button className="fee-edit" onClick={() => setEditing({ ...student, chosen: [...student.chosen], subjectDetails: studentFormDetails(student, groups) })}><Icon name="pencil" /></button><button className="fee-advance" onClick={() => setAdvance(student)} title="Paiement d'avance"><Icon name="advance" /></button></div></td></tr>)}</tbody></table></div>
+  </main>{selected && <div className="fee-overlay"><section className="payment-modal"><button className="modal-close" onClick={() => setSelected(null)}>×</button><h2>Paiement — {monthLabel(selected.index)}</h2><div className="payment-person"><i>{initials(selected.student.name)}</i><span><b>{selected.student.name}</b><small>{selected.student.code}</small></span></div><div className="payment-amount"><span>Montant dû</span><strong>{selected.student.monthly} DH</strong></div>{selected.student.payments[selected.index] === 'paid' ? <><div className="validated">✓ Paiement validé</div><button className="receipt-button" onClick={() => { setReceipt({ student:selected.student, month: monthLabel(selected.index) }); setSelected(null) }}>▣ &nbsp; Imprimer le reçu</button></> : <button className="validate-button" onClick={validate}>Valider le paiement</button>}</section></div>}
+  {editing && <EditSubjectsModal editing={editing} setEditing={setEditing} close={() => setEditing(null)} save={saveEdit} />}
+  {advance && <AdvanceModal student={advance} close={() => setAdvance(null)} onValidate={(selectedMonths) => validateAdvance(advance, selectedMonths)} />}
+  {advanceReceipts && <AdvanceReceiptsModal receipts={advanceReceipts} close={() => setAdvanceReceipts(null)} onPrint={(items) => { setAdvanceReceipts(null); setReceipt(items) }} />}</div>
+}

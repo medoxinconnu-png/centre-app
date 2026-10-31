@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 352" role="img" aria-label="Aperçu du tableau de bord Centre-App">
+  <rect width="360" height="352" rx="14" fill="#ffffff" fill-opacity=".12"/>
+  <rect x="18" y="18" width="324" height="316" rx="12" fill="#ffffff"/>
+  <!-- barre latérale -->
+  <rect x="18" y="18" width="70" height="316" rx="12" fill="#f3f6fd"/>
+  <rect x="30" y="32" width="22" height="22" rx="6" fill="#315fec"/>
+  <rect x="30" y="72" width="46" height="7" rx="3.5" fill="#315fec" opacity=".85"/>
+  <rect x="30" y="90" width="40" height="7" rx="3.5" fill="#c9d3e6"/>
+  <rect x="30" y="108" width="44" height="7" rx="3.5" fill="#c9d3e6"/>
+  <rect x="30" y="126" width="36" height="7" rx="3.5" fill="#c9d3e6"/>
+  <rect x="30" y="144" width="42" height="7" rx="3.5" fill="#c9d3e6"/>
+  <!-- en-tête -->
+  <text x="104" y="44" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#1d2433">Bonjour, Directeur</text>
+  <text x="104" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="9" fill="#8a93a5">Vue globale · toutes les succursales</text>
+  <!-- cartes indicateurs -->
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <rect x="104" y="74" width="72" height="54" rx="8" fill="#f7f9fc" stroke="#e3e8f1"/>
+    <text x="112" y="91" font-size="7" fill="#8a93a5">CA DU MOIS</text>
+    <text x="112" y="111" font-size="12" font-weight="700" fill="#1d2433">62 600</text>
+    <rect x="184" y="74" width="72" height="54" rx="8" fill="#f7f9fc" stroke="#e3e8f1"/>
+    <text x="192" y="91" font-size="7" fill="#8a93a5">ÉLÈVES</text>
+    <text x="192" y="111" font-size="12" font-weight="700" fill="#1d2433">86</text>
+    <rect x="264" y="74" width="66" height="54" rx="8" fill="#f7f9fc" stroke="#e3e8f1"/>
+    <text x="272" y="91" font-size="7" fill="#8a93a5">BÉNÉFICE</text>
+    <text x="272" y="111" font-size="12" font-weight="700" fill="#16a34a">+23 %</text>
+  </g>
+  <!-- courbe -->
+  <rect x="104" y="140" width="226" height="104" rx="8" fill="#f7f9fc" stroke="#e3e8f1"/>
+  <path d="M116 222 C 136 214, 146 206, 162 208 S 192 190, 210 194 S 240 176, 258 180 S 290 160, 318 156" fill="none" stroke="#315fec" stroke-width="3" stroke-linecap="round"/>
+  <path d="M116 222 C 136 214, 146 206, 162 208 S 192 190, 210 194 S 240 176, 258 180 S 290 160, 318 156 V 232 H 116 Z" fill="#315fec" opacity=".08"/>
+  <!-- barres succursales -->
+  <rect x="104" y="256" width="226" height="64" rx="8" fill="#f7f9fc" stroke="#e3e8f1"/>
+  <rect x="124" y="280" width="14" height="30" rx="3" fill="#315fec"/>
+  <rect x="142" y="292" width="14" height="18" rx="3" fill="#3fc553"/>
+  <rect x="196" y="288" width="14" height="22" rx="3" fill="#315fec"/>
+  <rect x="214" y="300" width="14" height="10" rx="3" fill="#3fc553"/>
+  <rect x="268" y="284" width="14" height="26" rx="3" fill="#315fec"/>
+  <rect x="286" y="294" width="14" height="16" rx="3" fill="#3fc553"/>
+</svg>
